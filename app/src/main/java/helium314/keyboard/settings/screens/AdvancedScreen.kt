@@ -272,6 +272,14 @@ fun createAdvancedSettings(context: Context) = listOf(
                 confirmButton = {
                     TextButton(onClick = { showDialog = false }) { Text("Close") }
                 },
+                dismissButton = {
+                    TextButton(onClick = {
+                        val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE)
+                                as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
+                            "glide import log", logLines.joinToString("\n")))
+                    }) { Text("Copy log") }
+                },
                 title = { Text(setting.title) },
                 text = {
                     Column(Modifier.verticalScroll(rememberScrollState())) {

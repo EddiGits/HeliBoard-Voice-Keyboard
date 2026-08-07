@@ -162,8 +162,17 @@ public final class GestureLibAutoImport {
             // 2) fall back to the extracted native library directory
             //    (system apps often keep libs outside the APK)
             if (info.nativeLibraryDir != null) {
-                final File nativeLib = new File(info.nativeLibraryDir, LIB_FILE_NAME);
-                log.log("  checking " + nativeLib.getAbsolutePath());
+                final File nativeDir = new File(info.nativeLibraryDir);
+                final File[] files = nativeDir.listFiles();
+                if (files == null) {
+                    log.log("  native lib dir not listable");
+                } else {
+                    log.log("  native lib dir contains " + files.length + " file(s):");
+                    for (final File f : files) {
+                        log.log("    " + f.getName() + " (" + f.length() + " bytes)");
+                    }
+                }
+                final File nativeLib = new File(nativeDir, LIB_FILE_NAME);
                 if (nativeLib.isFile()) {
                     log.log("  found in native lib dir, importing");
                     try (InputStream in = new FileInputStream(nativeLib)) {
@@ -172,15 +181,86 @@ public final class GestureLibAutoImport {
                         log.log("  ERROR reading native lib: " + e);
                     }
                 } else {
-                    log.log("  not present in native lib dir");
+                    log.log("  " + LIB_FILE_NAME + " not present in native lib dir");
                 }
             }
         }
+
+        // 3) factory-preinstalled Gboard: scan system partitions directly
+        if (scanSystemPartitions(context, libFile, log)) return true;
 
         if (!anyFound) {
             log.log("FAILED: no keyboard packages visible on this device");
         } else {
             log.log("FAILED: no glide typing library found in any scanned package");
+        }
+        return false;
+    }
+
+    // System-image app directories often hold the factory Gboard APK with its
+    // libraries either inside the APK or in an adjacent lib/<arch> directory.
+    private static boolean scanSystemPartitions(final Context context, final File libFile,
+            final Logger log) {
+        final String[] roots = {
+                "/system/app", "/system/priv-app", "/product/app", "/product/priv-app",
+                "/system_ext/app", "/system_ext/priv-app", "/vendor/app",
+        };
+        // extracted system lib dirs use short arch names
+        final String[] archDirs = {"arm64", "arm"};
+        log.log("scanning system partitions…");
+        for (final String root : roots) {
+            final File rootDir = new File(root);
+            final File[] appDirs = rootDir.listFiles();
+            if (appDirs == null) {
+                log.log("  " + root + ": not listable");
+                continue;
+            }
+            for (final File appDir : appDirs) {
+                final String lower = appDir.getName().toLowerCase(java.util.Locale.US);
+                if (!lower.contains("latinime") && !lower.contains("gboard")
+                        && !lower.contains("inputmethod")) continue;
+                log.log("  candidate dir: " + appDir.getAbsolutePath());
+                // adjacent extracted libs
+                for (final String arch : archDirs) {
+                    final File lib = new File(appDir, "lib/" + arch + "/" + LIB_FILE_NAME);
+                    log.log("    checking " + lib.getAbsolutePath()
+                            + (lib.isFile() ? " — FOUND" : " — no"));
+                    if (lib.isFile()) {
+                        try (InputStream in = new FileInputStream(lib)) {
+                            if (finishImport(context, in, libFile, log)) return true;
+                        } catch (Exception e) {
+                            log.log("    ERROR reading: " + e);
+                        }
+                    }
+                }
+                // apks inside the dir
+                final File[] apkFiles = appDir.listFiles();
+                if (apkFiles == null) continue;
+                for (final File apk : apkFiles) {
+                    if (!apk.getName().endsWith(".apk")) continue;
+                    try (ZipFile zip = new ZipFile(apk)) {
+                        final List<String> libEntries = new ArrayList<>();
+                        final Enumeration<? extends ZipEntry> entries = zip.entries();
+                        while (entries.hasMoreElements()) {
+                            final String name = entries.nextElement().getName();
+                            if (name.endsWith("/" + LIB_FILE_NAME)) libEntries.add(name);
+                        }
+                        log.log("    scanning " + apk.getName() + ": "
+                                + libEntries.size() + " gesture-lib match(es)");
+                        for (final String abi : Build.SUPPORTED_ABIS) {
+                            for (final String name : libEntries) {
+                                if (!name.contains("/" + abi + "/")) continue;
+                                log.log("    extracting " + name);
+                                try (InputStream in = zip.getInputStream(zip.getEntry(name))) {
+                                    if (finishImport(context, in, libFile, log)) return true;
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.log("    ERROR scanning " + apk.getName() + ": " + e);
+                    }
+                }
+            }
         }
         return false;
     }
