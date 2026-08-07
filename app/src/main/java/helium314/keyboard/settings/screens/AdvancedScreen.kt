@@ -45,6 +45,18 @@ import helium314.keyboard.settings.preferences.BackupRestorePreference
 import helium314.keyboard.settings.preferences.LoadGestureLibPreference
 import helium314.keyboard.settings.preferences.TextInputPreference
 import helium314.keyboard.voice.VoiceInput
+import helium314.keyboard.voice.GestureLibAutoImport
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.sp
 import helium314.keyboard.latin.utils.previewDark
 import androidx.core.content.edit
 import helium314.keyboard.keyboard.internal.keyboard_parser.LocaleKeyboardInfos
@@ -84,6 +96,7 @@ fun AdvancedSettingsScreen(
         Settings.PREF_MORE_POPUP_KEYS,
         Settings.PREF_TIMESTAMP_FORMAT,
         VoiceInput.PREF_API_KEY,
+        "glide_lib_import_debug",
         SettingsWithoutKey.BACKUP_RESTORE,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
@@ -234,6 +247,41 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, VoiceInput.PREF_API_KEY, R.string.openai_api_key_title) { setting ->
         TextInputPreference(setting, "", stringResource(R.string.openai_api_key_description))
+    },
+    Setting(context, "glide_lib_import_debug", R.string.glide_import_title) { setting ->
+        var showDialog by rememberSaveable { mutableStateOf(false) }
+        val logLines = remember { mutableStateListOf<String>() }
+        val ctx = LocalContext.current
+        Preference(
+            name = setting.title,
+            onClick = { showDialog = true },
+            description = stringResource(R.string.glide_import_description)
+        )
+        if (showDialog) {
+            LaunchedEffect(Unit) {
+                logLines.clear()
+                val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                Thread {
+                    GestureLibAutoImport.runImport(ctx) { line ->
+                        handler.post { logLines.add(line) }
+                    }
+                }.start()
+            }
+            AlertDialog(
+                onDismissRequest = { showDialog = false },
+                confirmButton = {
+                    TextButton(onClick = { showDialog = false }) { Text("Close") }
+                },
+                title = { Text(setting.title) },
+                text = {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        logLines.forEach {
+                            Text(it, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+            )
+        }
     },
     Setting(context, SettingsWithoutKey.DEBUG_SETTINGS, R.string.debug_settings_title) {
         Preference(

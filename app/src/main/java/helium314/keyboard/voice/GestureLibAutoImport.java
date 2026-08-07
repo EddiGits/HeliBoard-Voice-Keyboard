@@ -14,6 +14,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,29 +40,58 @@ public final class GestureLibAutoImport {
     private static final String TAG = "GestureLibAutoImport";
     private static final String LIB_FILE_NAME = "lib" + JniUtils.JNI_LIB_NAME_GOOGLE + ".so";
 
+    /** Receives one human-readable progress line per step. */
+    public interface Logger {
+        void log(String line);
+    }
+
     private GestureLibAutoImport() {}
 
-    /** Call early (before JniUtils is first used) — no-op if a library is already imported. */
+    /** Silent automatic variant for app startup — no-op if already imported. */
     public static void tryImportFromInstalledGboard(final Context context) {
         try {
-            final String failure = importInner(context);
-            if (failure != null) {
-                Log.w(TAG, failure);
-                Toast.makeText(context, failure, Toast.LENGTH_LONG).show();
+            final File libFile = new File(context.getFilesDir(), JniUtils.JNI_LIB_IMPORT_FILE_NAME);
+            if (libFile.isFile()) return; // already imported (manually or by us)
+            final boolean ok = runImport(context, new Logger() {
+                @Override
+                public void log(final String line) {
+                    Log.i(TAG, line);
+                }
+            });
+            if (ok) {
+                Toast.makeText(context, "Glide typing enabled (imported from Gboard)",
+                        Toast.LENGTH_LONG).show();
             }
         } catch (Throwable t) {
             Log.w(TAG, "auto-import failed", t);
-            try {
-                Toast.makeText(context, "Glide import error: " + t, Toast.LENGTH_LONG).show();
-            } catch (Throwable ignored) {}
         }
     }
 
-    // returns null when nothing needs reporting (already imported, disabled, or success)
-    private static String importInner(final Context context) throws Exception {
-        if (BuildConfig.BUILD_TYPE.equals("nouserlib")) return null;
+    /**
+     * Verbose variant for the settings screen: runs (or re-runs) the import,
+     * narrating every step through the logger. Returns true on success.
+     */
+    public static boolean runImport(final Context context, final Logger logger) {
+        try {
+            return importInner(context, logger);
+        } catch (Throwable t) {
+            logger.log("FATAL: " + t);
+            Log.w(TAG, "import failed", t);
+            return false;
+        }
+    }
+
+    private static boolean importInner(final Context context, final Logger log) throws Exception {
+        log.log("build type: " + BuildConfig.BUILD_TYPE);
+        if (BuildConfig.BUILD_TYPE.equals("nouserlib")) {
+            log.log("STOP: this build type does not allow loading a user library");
+            return false;
+        }
         final File libFile = new File(context.getFilesDir(), JniUtils.JNI_LIB_IMPORT_FILE_NAME);
-        if (libFile.isFile()) return null; // already imported (manually or by us)
+        log.log("target: " + libFile.getAbsolutePath());
+        log.log("target exists: " + libFile.isFile()
+                + ", library currently loaded: " + JniUtils.sHaveGestureLib);
+        log.log("device ABIs: " + Arrays.toString(Build.SUPPORTED_ABIS));
 
         // candidate packages: known Gboard ids plus every keyboard app on the device
         final LinkedHashSet<String> packages = new LinkedHashSet<>();
@@ -74,85 +104,101 @@ public final class GestureLibAutoImport {
             }
         }
         packages.remove(context.getPackageName());
+        log.log("candidate packages: " + packages);
 
-        boolean anyPackageFound = false;
-        final List<String> scanned = new ArrayList<>();
+        boolean anyFound = false;
         for (final String pkg : packages) {
             final ApplicationInfo info;
             try {
                 info = context.getPackageManager().getApplicationInfo(pkg, 0);
             } catch (Exception e) {
-                continue; // not installed or not visible
+                log.log("✗ " + pkg + ": not visible/installed (" + e.getClass().getSimpleName() + ")");
+                continue;
             }
-            anyPackageFound = true;
-            scanned.add(pkg);
-
+            anyFound = true;
+            log.log("✓ " + pkg);
+            log.log("  base apk: " + info.sourceDir);
             final List<String> apks = new ArrayList<>();
             if (info.sourceDir != null) apks.add(info.sourceDir);
             if (info.splitSourceDirs != null) {
-                for (final String split : info.splitSourceDirs) apks.add(split);
+                for (final String split : info.splitSourceDirs) {
+                    log.log("  split apk: " + split);
+                    apks.add(split);
+                }
             }
+            log.log("  native lib dir: " + info.nativeLibraryDir);
+
+            // 1) look inside the APK zips
             for (final String apkPath : apks) {
-                if (scanApkAndImport(apkPath, context, libFile)) {
-                    Log.i(TAG, "imported glide typing library from " + pkg
-                            + " (" + apkPath + ")");
-                    loadNow(libFile);
-                    Toast.makeText(context,
-                            "Glide typing enabled (library imported from " + pkg + ")",
-                            Toast.LENGTH_LONG).show();
-                    return null;
-                }
-            }
-        }
-
-        if (!anyPackageFound) {
-            return "Glide import: no Gboard/keyboard apps visible on this device";
-        }
-        return "Glide import: no glide library found in " + scanned;
-    }
-
-    // scans all entries of the apk for the gesture library, preferring the device's best ABI
-    private static boolean scanApkAndImport(final String apkPath, final Context context,
-            final File libFile) {
-        try (ZipFile zip = new ZipFile(apkPath)) {
-            final List<String> libEntries = new ArrayList<>();
-            final Enumeration<? extends ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements()) {
-                final String name = entries.nextElement().getName();
-                if (name.endsWith("/" + LIB_FILE_NAME) || name.equals(LIB_FILE_NAME)) {
-                    libEntries.add(name);
-                }
-            }
-            if (libEntries.isEmpty()) return false;
-            for (final String abi : Build.SUPPORTED_ABIS) {
-                for (final String name : libEntries) {
-                    if (name.contains("/" + abi + "/")
-                            && extractEntry(zip, name, context, libFile)) {
-                        return true;
+                final String shortName = apkPath.substring(apkPath.lastIndexOf('/') + 1);
+                try (ZipFile zip = new ZipFile(apkPath)) {
+                    final List<String> libEntries = new ArrayList<>();
+                    int total = 0;
+                    final Enumeration<? extends ZipEntry> entries = zip.entries();
+                    while (entries.hasMoreElements()) {
+                        total++;
+                        final String name = entries.nextElement().getName();
+                        if (name.endsWith("/" + LIB_FILE_NAME) || name.equals(LIB_FILE_NAME)) {
+                            libEntries.add(name);
+                        }
                     }
+                    log.log("  scanning " + shortName + ": " + total + " entries, "
+                            + libEntries.size() + " gesture-lib match(es)");
+                    for (final String name : libEntries) log.log("    found: " + name);
+                    for (final String abi : Build.SUPPORTED_ABIS) {
+                        for (final String name : libEntries) {
+                            if (!name.contains("/" + abi + "/")) continue;
+                            log.log("  extracting " + name);
+                            try (InputStream in = zip.getInputStream(zip.getEntry(name))) {
+                                if (finishImport(context, in, libFile, log)) return true;
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.log("  ERROR scanning " + shortName + ": " + e);
                 }
             }
-            return false;
-        } catch (Exception e) {
-            Log.w(TAG, "could not scan " + apkPath, e);
-            return false;
+
+            // 2) fall back to the extracted native library directory
+            //    (system apps often keep libs outside the APK)
+            if (info.nativeLibraryDir != null) {
+                final File nativeLib = new File(info.nativeLibraryDir, LIB_FILE_NAME);
+                log.log("  checking " + nativeLib.getAbsolutePath());
+                if (nativeLib.isFile()) {
+                    log.log("  found in native lib dir, importing");
+                    try (InputStream in = new FileInputStream(nativeLib)) {
+                        if (finishImport(context, in, libFile, log)) return true;
+                    } catch (Exception e) {
+                        log.log("  ERROR reading native lib: " + e);
+                    }
+                } else {
+                    log.log("  not present in native lib dir");
+                }
+            }
         }
+
+        if (!anyFound) {
+            log.log("FAILED: no keyboard packages visible on this device");
+        } else {
+            log.log("FAILED: no glide typing library found in any scanned package");
+        }
+        return false;
     }
 
-    private static boolean extractEntry(final ZipFile zip, final String entryName,
-            final Context context, final File libFile) {
+    private static boolean finishImport(final Context context, final InputStream in,
+            final File libFile, final Logger log) {
         final File tmpFile = new File(context.getFilesDir(), "tmp_gesture_lib");
         try {
-            final ZipEntry entry = zip.getEntry(entryName);
-            if (entry == null) return false;
-            try (InputStream in = zip.getInputStream(entry);
-                    OutputStream out = new FileOutputStream(tmpFile)) {
+            try (OutputStream out = new FileOutputStream(tmpFile)) {
                 final byte[] buffer = new byte[8192];
                 int read;
                 while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
             }
+            log.log("  copied " + tmpFile.length() + " bytes");
             final String checksum = ChecksumCalculator.INSTANCE.checksum(tmpFile);
+            log.log("  checksum: " + checksum);
             if (checksum == null || checksum.isEmpty()) {
+                log.log("  ERROR: could not compute checksum");
                 tmpFile.delete();
                 return false;
             }
@@ -160,14 +206,30 @@ public final class GestureLibAutoImport {
             // JniUtils accepts the file on the next startup as well
             KtxKt.protectedPrefs(context).edit()
                     .putString(Settings.PREF_LIBRARY_CHECKSUM, checksum).commit();
+            log.log("  checksum stored in prefs");
             libFile.setWritable(true);
             libFile.delete();
             copyFile(tmpFile, libFile);
             libFile.setReadOnly();
             tmpFile.delete();
+            log.log("  library installed at " + libFile.getAbsolutePath());
+            if (!JniUtils.sHaveGestureLib) {
+                log.log("  loading library into this process…");
+                try {
+                    System.load(libFile.getAbsolutePath());
+                    JniUtils.sHaveGestureLib = true;
+                    log.log("  loaded OK");
+                } catch (Throwable t) {
+                    log.log("  load failed (" + t + "), will load on next app start");
+                }
+            } else {
+                log.log("  a library is already loaded in this process");
+            }
+            log.log("SUCCESS — glide typing library imported. Gesture typing is enabled;"
+                    + " if swiping does not work yet, switch keyboards once or reboot.");
             return true;
         } catch (Exception e) {
-            Log.w(TAG, "could not extract " + entryName, e);
+            log.log("  ERROR during import: " + e);
             tmpFile.delete();
             return false;
         }
@@ -179,18 +241,6 @@ public final class GestureLibAutoImport {
             final byte[] buffer = new byte[8192];
             int read;
             while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
-        }
-    }
-
-    private static void loadNow(final File libFile) {
-        // if JniUtils was already initialized without a library, load it in
-        // this process too; otherwise the next startup picks it up anyway
-        if (JniUtils.sHaveGestureLib) return;
-        try {
-            System.load(libFile.getAbsolutePath());
-            JniUtils.sHaveGestureLib = true;
-        } catch (Throwable t) {
-            Log.w(TAG, "could not load imported library in this process", t);
         }
     }
 }

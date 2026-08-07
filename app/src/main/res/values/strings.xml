@@ -242,6 +242,9 @@
     <string name="timestamp_format_title">Format for timestamp key</string>
     <!-- Title for the OpenAI API key setting -->
     <string name="openai_api_key_title">OpenAI API key</string>
+    <string name="glide_import_title">Import glide typing library</string>
+    <!-- Description for the glide library import button -->
+    <string name="glide_import_description">Copy the gesture typing library from the Gboard installed on this device, showing a live log</string>
     <!-- Description for the OpenAI API key setting -->
     <string name="openai_api_key_description">Used by the mic key for AI voice typing. Get a key at platform.openai.com/api-keys</string>
     <!-- Message in preferences how to get timestamp key -->
