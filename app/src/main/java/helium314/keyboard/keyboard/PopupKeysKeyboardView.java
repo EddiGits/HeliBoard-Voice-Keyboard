@@ -111,7 +111,7 @@ public class PopupKeysKeyboardView extends KeyboardView implements PopupKeysPane
         }
         final Key shortcutKey = keyboard.getKey(KeyCode.VOICE_INPUT);
         if (shortcutKey != null) {
-            shortcutKey.setEnabled(RichInputMethodManager.getInstance().isShortcutImeReady());
+            shortcutKey.setEnabled(true); // voice input is built in, mic key always works
             invalidateKey(shortcutKey);
         }
     }

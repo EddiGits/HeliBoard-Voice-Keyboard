@@ -98,11 +98,10 @@ public final class InputAttributes {
 
         mShouldInsertSpacesAutomatically = InputTypeUtils.isAutoSpaceFriendlyType(mInputType);
 
+        // voice input is built in, so it does not depend on a shortcut IME being available
         final boolean noMicrophone = mIsPasswordField
                 || InputTypeUtils.isEmailVariation(variation)
-                || hasNoMicrophoneKeyOption()
-                || !RichInputMethodManager.isInitialized() // avoid crash when only using spell checker
-                || !RichInputMethodManager.getInstance().isShortcutImeReady();
+                || hasNoMicrophoneKeyOption();
         mShouldShowVoiceInputKey = !noMicrophone;
 
         mDisableGestureFloatingPreviewText = InputAttributes.inPrivateImeOptions(
