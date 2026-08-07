@@ -142,6 +142,7 @@ public class LatinIME extends InputMethodService implements
     private SuggestionStripView mSuggestionStripView;
 
     private RichInputMethodManager mRichImm;
+    private helium314.keyboard.voice.VoiceInput mVoiceInput;
     final KeyboardSwitcher mKeyboardSwitcher;
     private final SubtypeState mSubtypeState = new SubtypeState((InputMethodSubtype subtype) -> { switchToSubtype(subtype); return Unit.INSTANCE; });
     private final StatsUtilsManager mStatsUtilsManager;
@@ -1015,6 +1016,9 @@ public class LatinIME extends InputMethodService implements
     public void onWindowHidden() {
         super.onWindowHidden();
         Log.i(TAG, "onWindowHidden");
+        if (mVoiceInput != null) {
+            mVoiceInput.cancel();
+        }
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
         if (mainKeyboardView != null) {
             mainKeyboardView.closing();
@@ -1412,7 +1416,11 @@ public class LatinIME extends InputMethodService implements
     // completely replace #onCodeInput.
     public void onEvent(@NonNull final Event event) {
         if (KeyCode.VOICE_INPUT == event.getKeyCode()) {
-            mRichImm.switchToShortcutIme(this);
+            // Built-in AI voice input replaces the system voice IME hand-off
+            if (mVoiceInput == null) {
+                mVoiceInput = new helium314.keyboard.voice.VoiceInput(this);
+            }
+            mVoiceInput.onVoiceKey();
         }
         final InputTransaction completeInputTransaction =
                 mInputLogic.onCodeInput(mSettings.getCurrent(), event,

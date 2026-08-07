@@ -44,6 +44,7 @@ import helium314.keyboard.settings.dialogs.TextInputDialog
 import helium314.keyboard.settings.preferences.BackupRestorePreference
 import helium314.keyboard.settings.preferences.LoadGestureLibPreference
 import helium314.keyboard.settings.preferences.TextInputPreference
+import helium314.keyboard.voice.VoiceInput
 import helium314.keyboard.latin.utils.previewDark
 import androidx.core.content.edit
 import helium314.keyboard.keyboard.internal.keyboard_parser.LocaleKeyboardInfos
@@ -82,6 +83,7 @@ fun AdvancedSettingsScreen(
         Settings.PREF_CUSTOM_CURRENCY_KEY,
         Settings.PREF_MORE_POPUP_KEYS,
         Settings.PREF_TIMESTAMP_FORMAT,
+        VoiceInput.PREF_API_KEY,
         SettingsWithoutKey.BACKUP_RESTORE,
         if (BuildConfig.DEBUG || prefs.getBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, Defaults.PREF_SHOW_DEBUG_SETTINGS))
             SettingsWithoutKey.DEBUG_SETTINGS else null,
@@ -229,6 +231,9 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_TIMESTAMP_FORMAT, R.string.timestamp_format_title) { setting ->
         TextInputPreference(setting, Defaults.PREF_TIMESTAMP_FORMAT, stringResource(R.string.timestamp_description)) { checkTimestampFormat(it) }
+    },
+    Setting(context, VoiceInput.PREF_API_KEY, R.string.openai_api_key_title) { setting ->
+        TextInputPreference(setting, "", stringResource(R.string.openai_api_key_description))
     },
     Setting(context, SettingsWithoutKey.DEBUG_SETTINGS, R.string.debug_settings_title) {
         Preference(

@@ -240,6 +240,10 @@
     <string name="backup_restored">Backup restored</string>
     <!-- Preferences item for format for timestamp keycode -->
     <string name="timestamp_format_title">Format for timestamp key</string>
+    <!-- Title for the OpenAI API key setting -->
+    <string name="openai_api_key_title">OpenAI API key</string>
+    <!-- Description for the OpenAI API key setting -->
+    <string name="openai_api_key_description">Used by the mic key for AI voice typing. Get a key at platform.openai.com/api-keys</string>
     <!-- Message in preferences how to get timestamp key -->
     <string name="timestamp_description">You can add the timestamp key using a custom layout with \'timestamp\' key, or key code -10043</string>
     <!-- Preferences item for choosing secondary language -->
