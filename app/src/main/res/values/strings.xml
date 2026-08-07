@@ -242,6 +242,9 @@
     <string name="timestamp_format_title">Format for timestamp key</string>
     <!-- Title for the OpenAI API key setting -->
     <string name="openai_api_key_title">OpenAI API key</string>
+    <string name="voice_fullscreen_title">Full-screen voice panel</string>
+    <!-- Description for the full-screen voice panel toggle -->
+    <string name="voice_fullscreen_description">Show recording controls over the whole keyboard instead of an inline bar</string>
     <string name="glide_import_title">Import glide typing library</string>
     <!-- Description for the glide library import button -->
     <string name="glide_import_description">Copy the gesture typing library from the Gboard installed on this device, showing a live log</string>
