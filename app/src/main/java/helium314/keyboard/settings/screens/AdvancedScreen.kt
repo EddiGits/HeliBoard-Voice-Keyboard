@@ -47,6 +47,7 @@ import helium314.keyboard.settings.preferences.TextInputPreference
 import helium314.keyboard.voice.VoiceInput
 import helium314.keyboard.voice.GestureLibAutoImport
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -258,7 +259,8 @@ fun createAdvancedSettings(context: Context) = listOf(
             description = stringResource(R.string.glide_import_description)
         )
         if (showDialog) {
-            LaunchedEffect(Unit) {
+            var runCounter by rememberSaveable { mutableStateOf(0) }
+            LaunchedEffect(runCounter) {
                 logLines.clear()
                 val handler = android.os.Handler(android.os.Looper.getMainLooper())
                 Thread {
@@ -270,15 +272,16 @@ fun createAdvancedSettings(context: Context) = listOf(
             AlertDialog(
                 onDismissRequest = { showDialog = false },
                 confirmButton = {
-                    TextButton(onClick = { showDialog = false }) { Text("Close") }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE)
-                                as android.content.ClipboardManager
-                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
-                            "glide import log", logLines.joinToString("\n")))
-                    }) { Text("Copy log") }
+                    Row {
+                        TextButton(onClick = { runCounter++ }) { Text("Re-run") }
+                        TextButton(onClick = {
+                            val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE)
+                                    as android.content.ClipboardManager
+                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
+                                "glide import log", logLines.joinToString("\n")))
+                        }) { Text("Copy") }
+                        TextButton(onClick = { showDialog = false }) { Text("Close") }
+                    }
                 },
                 title = { Text(setting.title) },
                 text = {

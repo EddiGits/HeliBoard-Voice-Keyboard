@@ -133,17 +133,22 @@ public final class GestureLibAutoImport {
                 final String shortName = apkPath.substring(apkPath.lastIndexOf('/') + 1);
                 try (ZipFile zip = new ZipFile(apkPath)) {
                     final List<String> libEntries = new ArrayList<>();
+                    final LinkedHashSet<String> allSo = new LinkedHashSet<>();
                     int total = 0;
                     final Enumeration<? extends ZipEntry> entries = zip.entries();
                     while (entries.hasMoreElements()) {
                         total++;
                         final String name = entries.nextElement().getName();
+                        if (name.startsWith("lib/") && name.endsWith(".so")) {
+                            allSo.add(name.substring(name.lastIndexOf('/') + 1));
+                        }
                         if (name.endsWith("/" + LIB_FILE_NAME) || name.equals(LIB_FILE_NAME)) {
                             libEntries.add(name);
                         }
                     }
                     log.log("  scanning " + shortName + ": " + total + " entries, "
                             + libEntries.size() + " gesture-lib match(es)");
+                    if (!allSo.isEmpty()) log.log("    .so libs here: " + allSo);
                     for (final String name : libEntries) log.log("    found: " + name);
                     for (final String abi : Build.SUPPORTED_ABIS) {
                         for (final String name : libEntries) {
