@@ -20,6 +20,8 @@ import kotlinx.coroutines.launch
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+        // before anything touches JniUtils, so the library loads on this startup already
+        helium314.keyboard.voice.GestureLibAutoImport.tryImportFromInstalledGboard(this)
         DebugFlags.init(this)
         FoldableUtils.init(this)
         Settings.init(this)
