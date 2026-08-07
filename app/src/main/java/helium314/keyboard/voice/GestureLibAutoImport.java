@@ -70,6 +70,9 @@ public final class GestureLibAutoImport {
                     if (extractEntry(apkPath, entryPath, context, libFile)) {
                         Log.i(TAG, "imported glide typing library from " + pkg + " (" + abi + ")");
                         loadNow(libFile);
+                        android.widget.Toast.makeText(context,
+                                "Glide typing enabled (library imported from Gboard)",
+                                android.widget.Toast.LENGTH_LONG).show();
                         return;
                     }
                 }

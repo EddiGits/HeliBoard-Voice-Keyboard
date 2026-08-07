@@ -16,6 +16,12 @@ SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
     <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 
+    <!-- Android 11+ package visibility: needed so the gesture library
+         auto-import can find the installed Gboard -->
+    <queries>
+        <package android:name="com.google.android.inputmethod.latin" />
+    </queries>
+
     <application android:label="@string/english_ime_name"
             android:name="helium314.keyboard.latin.App"
             android:icon="@mipmap/ic_launcher"
