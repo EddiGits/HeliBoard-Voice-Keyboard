@@ -20,6 +20,9 @@ SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
          auto-import can find the installed Gboard -->
     <queries>
         <package android:name="com.google.android.inputmethod.latin" />
+        <intent>
+            <action android:name="android.view.InputMethod" />
+        </intent>
     </queries>
 
     <application android:label="@string/english_ime_name"
