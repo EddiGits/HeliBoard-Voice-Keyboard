@@ -79,6 +79,15 @@ public class VoiceInput {
 
     /** Entry point for the mic key. */
     public void onVoiceKey() {
+        try {
+            onVoiceKeyInner();
+        } catch (Exception e) {
+            android.util.Log.e("VoiceInput", "voice key failed", e);
+            toast("Voice input error: " + e.getMessage());
+        }
+    }
+
+    private void onVoiceKeyInner() {
         if (mRecording || mProcessing) return;
 
         final SharedPreferences prefs = DeviceProtectedUtils.getSharedPreferences(mLatinIme);
