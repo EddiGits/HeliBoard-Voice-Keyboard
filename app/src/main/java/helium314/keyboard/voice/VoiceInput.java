@@ -311,7 +311,10 @@ public class VoiceInput {
         mPopup = new PopupWindow(strip,
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         mPopup.setClippingEnabled(false);
-        mPopup.showAtLocation(anchor, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, dp(6));
+        // Float just above the keyboard, over the toolbar area, so the
+        // controls are next to the mic key instead of the top of the screen
+        mPopup.showAtLocation(anchor, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL,
+                0, anchor.getHeight() + dp(12));
     }
 
     private Button makeStripButton(final String label, final String color,
@@ -331,8 +334,8 @@ public class VoiceInput {
         bg.setColor(Color.parseColor(color));
         bg.setCornerRadius(dp(16));
         b.setBackground(bg);
-        final LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(42), dp(32));
-        params.setMargins(dp(3), 0, dp(3), 0);
+        final LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(52), dp(38));
+        params.setMargins(dp(4), 0, dp(4), 0);
         b.setLayoutParams(params);
         b.setOnClickListener(listener);
         return b;
