@@ -138,7 +138,8 @@ val defaultToolbarPref by lazy {
 }
 
 val defaultPinnedToolbarPref = entries.filterNot { it == CLOSE_HISTORY }.joinToString(Separators.ENTRY) {
-    it.name + Separators.KV + false
+    // mic is pinned by default so built-in voice input is always one tap away
+    it.name + Separators.KV + (it == VOICE)
 }
 
 val defaultClipboardToolbarPref by lazy {
